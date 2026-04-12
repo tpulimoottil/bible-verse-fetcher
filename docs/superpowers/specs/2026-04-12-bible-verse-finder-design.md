@@ -6,7 +6,9 @@ A single-file HTML web app that drills Bible verse lookup speed. The user's 10-y
 
 ## Target User
 
-- 10-year-old girl
+- Neha, 10-year-old girl
+- Attends St Mary's Syriac Orthodox Church in Livermore, CA
+- Preparing for a Sunday school Bible verse competition
 - Using a standard Protestant Bible (66 books)
 - Running the app in a desktop browser (no mobile needed)
 - Honor system — no verse text verification
@@ -161,6 +163,23 @@ Progress bar shows percentage toward next level.
 | Master Navigator | Find verses in all 66 books |
 
 Badges are checked after each round completes. Newly earned badges are highlighted on the Round Summary screen.
+
+### Encouragement Messages
+
+The app addresses Neha by name and shows encouraging messages at key moments:
+
+**Result Flash (after each verse):**
+- Rotating encouraging phrases like "Great job, Neha!", "You're getting faster!", "Keep it up, Neha!", "God is proud of you!"
+- When she beats her average: "Amazing, Neha! That was faster than your average!"
+- When she sets a personal best: "New personal best, Neha! You're on fire!"
+
+**Round Summary:**
+- Motivational closing messages like "Awesome round, Neha! You're going to do great at Sunday school!", "Practice makes perfect — keep going, Neha!", "You're becoming a Bible navigation expert!"
+- When she improves over previous rounds: "You're improving, Neha! Your hard work is paying off!"
+
+**Home Screen:**
+- Welcome message: "Welcome back, Neha!" (or "Welcome, Neha!" on first run)
+- Streak encouragement: "You've been practicing 5 days straight — amazing dedication!"
 
 ### Personal Bests
 
