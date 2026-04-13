@@ -12,8 +12,8 @@
       min-height: 100vh;
       color: #1E3A5F;
     }
-    .screen { display: none; min-height: 100vh; opacity: 0; transition: opacity 0.2s ease; }
-    .screen.active { display: flex; flex-direction: column; opacity: 1; }
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: flex; flex-direction: column; }
 
     /* -- Home Screen -- */
     .home-header { padding: 32px 48px 0; }
@@ -131,6 +131,7 @@
       <div class="verse-subtitle">Find this verse in your Bible!</div>
       <div class="verse-timer" id="verse-timer">00:00</div>
       <button class="found-btn" onclick="foundIt()">Found It!</button>
+      <div style="font-size: 13px; color: #6B8FD4; margin-top: 8px;">(or press Spacebar)</div>
     </div>
   </div>
 
@@ -400,7 +401,8 @@
       const totalSeconds = Math.floor(ms / 1000);
       const minutes = Math.floor(totalSeconds / 60);
       const seconds = totalSeconds % 60;
-      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      const tenths = Math.floor((ms % 1000) / 100);
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${tenths}`;
     }
 
     function formatTime(ms) {
@@ -409,7 +411,9 @@
     }
 
     async function foundIt() {
+      if (!timerInterval) return; // guard against double-click/spacebar
       clearInterval(timerInterval);
+      timerInterval = null;
       const elapsed = performance.now() - timerStart;
       currentRound.times.push(elapsed);
 
@@ -636,7 +640,9 @@
       // Streak
       const streakEl = document.getElementById('streak-banner');
       if (streak > 0) {
-        streakEl.textContent = `🔥 ${streak} day streak! ${streak >= 5 ? 'Amazing dedication!' : 'Keep it going!'}`;
+        streakEl.textContent = streak >= 5
+          ? `🔥 You've been practicing ${streak} days straight — amazing dedication!`
+          : `🔥 ${streak} day streak! Keep it going!`;
       } else if (rounds.length > 0) {
         streakEl.textContent = 'Start a round today to begin a new streak!';
       } else {
@@ -644,8 +650,10 @@
       }
 
       // Level
-      document.getElementById('level-label').textContent =
-        `Level ${level.level} · ${level.name}`;
+      const nextLevel = LEVELS.find(l => l.rounds > rounds.length);
+      document.getElementById('level-label').textContent = nextLevel
+        ? `Level ${level.level} · ${level.name} — ${Math.round(level.progress)}% to Level ${nextLevel.level}`
+        : `Level ${level.level} · ${level.name} — Max Level!`;
       document.getElementById('level-bar-fill').style.width = `${level.progress}%`;
 
       // Stats
@@ -683,6 +691,9 @@
     // ── App Init ──
     initDB().then(() => {
       refreshHomeScreen();
+    }).catch(() => {
+      document.getElementById('home-welcome').textContent =
+        'Oops! Something went wrong loading saved data. Try a different browser, Neha!';
     });
   </script>
 </body>
