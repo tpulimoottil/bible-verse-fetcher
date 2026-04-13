@@ -692,12 +692,18 @@
     });
 
     // ── App Init ──
-    initDB().then(() => {
-      refreshHomeScreen();
-    }).catch(() => {
-      document.getElementById('home-welcome').textContent =
-        'Oops! Something went wrong loading saved data. Try a different browser, Neha!';
-    });
+    // Open with ?reset to wipe all data and start fresh
+    if (new URLSearchParams(window.location.search).has('reset')) {
+      indexedDB.deleteDatabase('BibleVerseFinder');
+      window.location.href = window.location.pathname;
+    } else {
+      initDB().then(() => {
+        refreshHomeScreen();
+      }).catch(() => {
+        document.getElementById('home-welcome').textContent =
+          'Oops! Something went wrong loading saved data. Try a different browser, Neha!';
+      });
+    }
   </script>
 </body>
 </html>
