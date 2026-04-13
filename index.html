@@ -35,8 +35,12 @@
     .badges-section { width: 100%; max-width: 700px; }
     .badges-title { font-size: 14px; color: #6B8FD4; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; text-align: center; }
     .badges-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
-    .badge { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; background: white; box-shadow: 0 2px 8px rgba(26,86,219,0.08); }
+    .badge { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; background: white; box-shadow: 0 2px 8px rgba(26,86,219,0.08); position: relative; }
     .badge.locked { opacity: 0.3; filter: grayscale(1); }
+    .badge .badge-tooltip { display: none; position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: #1E3A5F; color: white; padding: 8px 14px; border-radius: 10px; font-size: 12px; font-weight: 500; white-space: nowrap; z-index: 10; pointer-events: none; text-align: center; line-height: 1.4; }
+    .badge .badge-tooltip .badge-tooltip-name { font-weight: 700; font-size: 13px; display: block; margin-bottom: 2px; }
+    .badge .badge-tooltip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #1E3A5F; }
+    .badge:hover .badge-tooltip { display: block; }
     .round-buttons { display: flex; gap: 16px; margin-top: 8px; }
     .round-btn { border: none; color: white; border-radius: 16px; padding: 18px 40px; font-size: 18px; font-weight: 700; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; }
     .round-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(59,130,246,0.3); }
@@ -674,8 +678,7 @@
       for (const badge of BADGE_DEFS) {
         const el = document.createElement('div');
         el.className = 'badge' + (earned.has(badge.id) ? '' : ' locked');
-        el.textContent = badge.icon;
-        el.title = `${badge.name}: ${badge.desc}`;
+        el.innerHTML = `${badge.icon}<div class="badge-tooltip"><span class="badge-tooltip-name">${badge.name}</span>${badge.desc}</div>`;
         grid.appendChild(el);
       }
     }
