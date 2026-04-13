@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bible Verse Finder — Neha</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #E8F4FD 0%, #D1ECFF 100%);
+      min-height: 100vh;
+      color: #1E3A5F;
+    }
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: flex; flex-direction: column; }
+
+    /* -- Home Screen -- */
+    .home-header { padding: 32px 48px 0; }
+    .home-header h1 { font-size: 28px; font-weight: 700; color: #1A56DB; }
+    .home-welcome { font-size: 18px; color: #6B8FD4; margin-top: 4px; }
+    .home-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 48px; gap: 32px; }
+    .streak-banner { font-size: 16px; color: #8B5CF6; font-weight: 600; }
+    .level-bar-container { width: 100%; max-width: 500px; }
+    .level-label { font-size: 14px; color: #6B8FD4; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+    .level-bar { background: #E2E8F0; border-radius: 8px; height: 12px; overflow: hidden; }
+    .level-bar-fill { background: linear-gradient(90deg, #3B82F6, #8B5CF6); height: 100%; border-radius: 8px; transition: width 0.5s ease; }
+    .stats-row { display: flex; gap: 16px; }
+    .stat-card { background: white; border-radius: 16px; padding: 20px 32px; text-align: center; box-shadow: 0 2px 12px rgba(26,86,219,0.08); min-width: 140px; }
+    .stat-value { font-size: 28px; font-weight: 700; }
+    .stat-value.blue { color: #3B82F6; }
+    .stat-value.purple { color: #8B5CF6; }
+    .stat-value.green { color: #10B981; }
+    .stat-label { font-size: 13px; color: #6B8FD4; margin-top: 4px; }
+    .badges-section { width: 100%; max-width: 700px; }
+    .badges-title { font-size: 14px; color: #6B8FD4; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; text-align: center; }
+    .badges-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+    .badge { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; background: white; box-shadow: 0 2px 8px rgba(26,86,219,0.08); }
+    .badge.locked { opacity: 0.3; filter: grayscale(1); }
+    .round-buttons { display: flex; gap: 16px; margin-top: 8px; }
+    .round-btn { border: none; color: white; border-radius: 16px; padding: 18px 40px; font-size: 18px; font-weight: 700; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; }
+    .round-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(59,130,246,0.3); }
+    .round-btn:active { transform: translateY(0); }
+    .round-btn.blue { background: #3B82F6; }
+    .round-btn.purple { background: #8B5CF6; }
+    .round-btn.green { background: #10B981; }
+
+    /* -- Verse Screen -- */
+    .verse-topbar { display: flex; justify-content: space-between; align-items: center; padding: 20px 48px; }
+    .verse-topbar-left { font-size: 16px; font-weight: 600; color: #1A56DB; }
+    .verse-topbar-right { display: flex; gap: 24px; align-items: center; font-size: 13px; color: #6B8FD4; }
+    .verse-topbar-right strong { color: #3B82F6; }
+    .progress-bar { display: flex; gap: 4px; padding: 0 48px; }
+    .progress-segment { flex: 1; height: 6px; border-radius: 3px; background: #E2E8F0; transition: background 0.3s; }
+    .progress-segment.done { background: #3B82F6; }
+    .progress-segment.current { background: #8B5CF6; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .verse-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+    .verse-reference { font-size: 64px; font-weight: 800; color: #1A56DB; text-align: center; line-height: 1.1; }
+    .verse-subtitle { font-size: 16px; color: #6B8FD4; }
+    .verse-timer { font-size: 88px; font-weight: 800; color: #8B5CF6; font-variant-numeric: tabular-nums; letter-spacing: 2px; margin: 24px 0; }
+    .found-btn { background: #3B82F6; color: white; border: none; border-radius: 16px; padding: 20px 80px; font-size: 22px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 16px rgba(59,130,246,0.3); transition: transform 0.1s, box-shadow 0.1s; }
+    .found-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(59,130,246,0.4); }
+    .found-btn:active { transform: translateY(0); }
+
+    /* -- Result Flash -- */
+    .result-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+    .result-time { font-size: 72px; font-weight: 800; color: #10B981; }
+    .result-message { font-size: 22px; color: #1A56DB; font-weight: 600; }
+    .result-comparison { font-size: 16px; color: #6B8FD4; }
+
+    /* -- Round Summary -- */
+    .summary-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px; gap: 24px; }
+    .summary-title { font-size: 36px; font-weight: 800; color: #1A56DB; }
+    .summary-encouragement { font-size: 18px; color: #6B8FD4; text-align: center; max-width: 500px; }
+    .summary-stats { display: flex; gap: 16px; }
+    .summary-comparison { font-size: 16px; color: #8B5CF6; font-weight: 600; }
+    .summary-badges { display: flex; gap: 12px; margin-top: 8px; }
+    .summary-badge { display: flex; align-items: center; gap: 8px; background: white; border-radius: 12px; padding: 12px 20px; box-shadow: 0 2px 12px rgba(26,86,219,0.08); }
+    .summary-badge-icon { font-size: 24px; }
+    .summary-badge-name { font-size: 14px; font-weight: 600; color: #1A56DB; }
+    .play-again-btn { background: #3B82F6; color: white; border: none; border-radius: 16px; padding: 18px 48px; font-size: 18px; font-weight: 700; cursor: pointer; margin-top: 16px; transition: transform 0.1s; }
+    .play-again-btn:hover { transform: translateY(-2px); }
+  </style>
+</head>
+<body>
+  <!-- HOME SCREEN -->
+  <div id="home-screen" class="screen active">
+    <div class="home-header">
+      <h1>Bible Verse Finder</h1>
+      <div class="home-welcome" id="home-welcome">Welcome, Neha!</div>
+    </div>
+    <div class="home-body">
+      <div class="streak-banner" id="streak-banner"></div>
+      <div class="level-bar-container">
+        <div class="level-label" id="level-label">Level 1 · Beginner</div>
+        <div class="level-bar"><div class="level-bar-fill" id="level-bar-fill" style="width: 0%"></div></div>
+      </div>
+      <div class="stats-row" id="stats-row">
+        <div class="stat-card"><div class="stat-value purple" id="stat-best">—</div><div class="stat-label">Best Time</div></div>
+        <div class="stat-card"><div class="stat-value blue" id="stat-avg">—</div><div class="stat-label">Average</div></div>
+        <div class="stat-card"><div class="stat-value green" id="stat-rounds">0</div><div class="stat-label">Rounds</div></div>
+      </div>
+      <div class="badges-section">
+        <div class="badges-title">Badges</div>
+        <div class="badges-grid" id="badges-grid"></div>
+      </div>
+      <div class="round-buttons">
+        <button class="round-btn blue" onclick="startRound(5)">5 Verses</button>
+        <button class="round-btn purple" onclick="startRound(10)">10 Verses</button>
+        <button class="round-btn green" onclick="startRound(20)">20 Verses</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VERSE SCREEN -->
+  <div id="verse-screen" class="screen">
+    <div class="verse-topbar">
+      <div class="verse-topbar-left">Bible Verse Finder</div>
+      <div class="verse-topbar-right">
+        <span>Avg: <strong id="running-avg">—</strong></span>
+        <span>Best: <strong id="running-best">—</strong></span>
+        <span id="verse-count">1 / 5</span>
+      </div>
+    </div>
+    <div class="progress-bar" id="progress-bar"></div>
+    <div class="verse-body">
+      <div class="verse-reference" id="verse-reference">Genesis 1:1</div>
+      <div class="verse-subtitle">Find this verse in your Bible!</div>
+      <div class="verse-timer" id="verse-timer">00:00</div>
+      <button class="found-btn" onclick="foundIt()">Found It!</button>
+    </div>
+  </div>
+
+  <!-- RESULT FLASH -->
+  <div id="result-screen" class="screen">
+    <div class="result-body">
+      <div class="result-time" id="result-time">12s</div>
+      <div class="result-message" id="result-message">Great job, Neha!</div>
+      <div class="result-comparison" id="result-comparison"></div>
+    </div>
+  </div>
+
+  <!-- ROUND SUMMARY -->
+  <div id="summary-screen" class="screen">
+    <div class="summary-body">
+      <div class="summary-title" id="summary-title">Awesome Round!</div>
+      <div class="summary-encouragement" id="summary-encouragement"></div>
+      <div class="summary-stats" id="summary-stats"></div>
+      <div class="summary-comparison" id="summary-comparison"></div>
+      <div class="summary-badges" id="summary-badges"></div>
+      <button class="play-again-btn" onclick="goHome()">Play Again</button>
+    </div>
+  </div>
+
+  <script>
+    // ── Bible Data (66 books, verse counts per chapter) ──
+    const BIBLE = [
+      { name: "Genesis", chapters: [31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,38,18,34,24,20,67,34,35,46,22,35,43,55,32,20,31,29,43,36,30,23,23,57,38,34,34,28,34,31,22,33,26] },
+      { name: "Exodus", chapters: [22,25,22,31,23,30,25,32,35,29,10,51,22,31,27,36,16,27,25,26,36,31,33,18,40,37,21,43,46,38,18,35,23,35,35,38,29,31,43,38] },
+      { name: "Leviticus", chapters: [17,16,17,35,19,30,38,36,24,20,47,8,59,57,33,34,16,30,37,27,24,33,44,23,55,46,34] },
+      { name: "Numbers", chapters: [54,34,51,49,31,27,89,26,23,36,35,16,33,45,41,50,13,32,22,29,35,41,30,25,18,65,23,31,40,16,54,42,56,29,34,13] },
+      { name: "Deuteronomy", chapters: [46,37,29,49,33,25,26,20,29,22,32,32,18,29,23,22,20,22,21,20,23,30,25,22,19,19,26,68,29,20,30,52,29,12] },
+      { name: "Joshua", chapters: [18,24,17,24,15,27,26,35,27,43,23,24,33,15,63,10,18,28,51,9,45,34,16,33] },
+      { name: "Judges", chapters: [36,23,31,24,31,40,25,35,57,18,40,15,25,20,20,31,13,31,30,48,25] },
+      { name: "Ruth", chapters: [22,23,18,22] },
+      { name: "1 Samuel", chapters: [28,36,21,22,12,21,17,22,27,27,15,25,23,52,35,23,58,30,24,43,15,23,28,23,44,25,12,25,11,31,13] },
+      { name: "2 Samuel", chapters: [27,32,39,12,25,23,29,18,13,19,27,31,39,33,37,23,29,33,43,26,22,51,39,25] },
+      { name: "1 Kings", chapters: [53,46,28,34,18,38,51,66,28,29,43,33,34,31,34,34,24,46,21,43,29,53] },
+      { name: "2 Kings", chapters: [18,25,27,44,27,33,20,29,37,36,21,21,25,29,38,20,41,37,37,21,26,20,37,20,30] },
+      { name: "1 Chronicles", chapters: [54,55,24,43,26,81,40,40,44,14,47,40,14,17,29,43,27,17,19,8,30,19,32,31,31,32,34,21,30] },
+      { name: "2 Chronicles", chapters: [17,18,17,22,14,42,22,18,31,19,23,16,22,15,19,14,19,34,11,37,20,12,21,27,28,23,9,27,36,27,21,33,25,33,27,23] },
+      { name: "Ezra", chapters: [11,70,13,24,17,22,28,36,15,44] },
+      { name: "Nehemiah", chapters: [11,20,32,23,19,19,73,18,38,39,36,47,31] },
+      { name: "Esther", chapters: [22,23,15,17,14,14,10,17,32,3] },
+      { name: "Job", chapters: [22,13,26,21,27,30,21,22,35,22,20,25,28,22,35,22,16,21,29,29,34,30,17,25,6,14,23,28,25,31,40,22,33,37,16,33,24,41,30,24,34,17] },
+      { name: "Psalms", chapters: [6,12,8,8,12,10,17,9,20,18,7,8,6,7,5,11,15,50,14,9,13,31,6,10,22,12,14,9,11,12,24,11,22,22,28,12,40,22,13,17,13,11,5,26,17,11,9,14,20,23,19,9,6,7,23,13,11,11,17,12,8,12,11,10,13,20,7,35,36,5,24,20,28,23,10,12,20,72,13,19,16,8,18,12,13,17,7,18,52,17,16,15,5,23,11,13,12,9,9,5,8,28,22,35,45,48,43,13,31,7,10,10,9,8,18,19,2,29,176,7,8,9,4,8,5,6,5,6,8,8,3,18,3,3,21,26,9,8,24,13,10,7,12,15,21,10,20,14,9,6] },
+      { name: "Proverbs", chapters: [33,22,35,27,23,35,27,36,18,32,31,28,25,35,33,33,28,24,29,30,31,29,35,34,28,28,27,28,27,33,31] },
+      { name: "Ecclesiastes", chapters: [18,26,22,16,20,12,29,17,18,20,10,14] },
+      { name: "Song of Solomon", chapters: [17,17,11,16,16,13,13,14] },
+      { name: "Isaiah", chapters: [31,22,26,6,30,13,25,22,21,34,16,6,22,32,9,14,14,7,25,6,17,25,18,23,12,21,13,29,24,33,9,20,24,17,10,22,38,22,8,31,29,25,28,28,25,13,15,22,26,11,23,15,12,17,13,12,21,14,21,22,11,12,19,12,25,24] },
+      { name: "Jeremiah", chapters: [19,37,25,31,31,30,34,22,26,25,23,17,27,22,21,21,27,23,15,18,14,30,40,10,38,24,22,17,32,24,40,44,26,22,19,32,21,28,18,16,18,22,13,30,5,28,7,47,39,46,64,34] },
+      { name: "Lamentations", chapters: [22,22,66,22,22] },
+      { name: "Ezekiel", chapters: [28,10,27,17,17,14,27,18,11,22,25,28,23,23,8,63,24,32,14,49,32,31,49,27,17,21,36,26,21,26,18,32,33,31,15,38,28,23,29,49,26,20,27,31,25,24,23,35] },
+      { name: "Daniel", chapters: [21,49,30,37,31,28,28,27,27,21,45,13] },
+      { name: "Hosea", chapters: [11,23,5,19,15,11,16,14,17,15,12,14,16,9] },
+      { name: "Joel", chapters: [20,32,21] },
+      { name: "Amos", chapters: [15,16,15,13,27,14,17,14,15] },
+      { name: "Obadiah", chapters: [21] },
+      { name: "Jonah", chapters: [17,10,10,11] },
+      { name: "Micah", chapters: [16,13,12,13,15,16,20] },
+      { name: "Nahum", chapters: [15,13,19] },
+      { name: "Habakkuk", chapters: [17,20,19] },
+      { name: "Zephaniah", chapters: [18,15,20] },
+      { name: "Haggai", chapters: [15,23] },
+      { name: "Zechariah", chapters: [21,13,10,14,11,15,14,23,17,12,17,14,9,21] },
+      { name: "Malachi", chapters: [14,17,18,6] },
+      { name: "Matthew", chapters: [25,23,17,25,48,34,29,34,38,42,30,50,58,36,39,28,27,35,30,34,46,46,39,51,46,75,66,20] },
+      { name: "Mark", chapters: [45,28,35,41,43,56,37,38,50,52,33,44,37,72,47,20] },
+      { name: "Luke", chapters: [80,52,38,44,39,49,50,56,62,42,54,59,35,35,32,31,37,43,48,47,38,71,56,53] },
+      { name: "John", chapters: [51,25,36,54,47,71,53,59,41,42,57,50,38,31,27,33,26,40,42,31,25] },
+      { name: "Acts", chapters: [26,47,26,37,42,15,60,40,43,48,30,25,52,28,41,40,34,28,41,38,40,30,35,27,27,32,44,31] },
+      { name: "Romans", chapters: [32,29,31,25,21,23,25,39,33,21,36,21,14,23,33,27] },
+      { name: "1 Corinthians", chapters: [31,16,23,21,13,20,40,13,27,33,34,31,13,40,58,10] },
+      { name: "2 Corinthians", chapters: [24,17,18,18,21,18,16,24,15,18,33,21,14] },
+      { name: "Galatians", chapters: [24,21,29,31,26,18] },
+      { name: "Ephesians", chapters: [23,22,21,32,33,24] },
+      { name: "Philippians", chapters: [30,30,21,23] },
+      { name: "Colossians", chapters: [29,23,25,18] },
+      { name: "1 Thessalonians", chapters: [10,20,13,18,28] },
+      { name: "2 Thessalonians", chapters: [12,17,18] },
+      { name: "1 Timothy", chapters: [20,15,16,16,25,21] },
+      { name: "2 Timothy", chapters: [18,26,17,22] },
+      { name: "Titus", chapters: [16,15,15] },
+      { name: "Philemon", chapters: [25] },
+      { name: "Hebrews", chapters: [14,18,19,16,14,20,28,13,28,39,40,29,25] },
+      { name: "James", chapters: [27,26,18,17,20] },
+      { name: "1 Peter", chapters: [25,25,22,19,14] },
+      { name: "2 Peter", chapters: [21,22,18] },
+      { name: "1 John", chapters: [10,29,24,21,21] },
+      { name: "2 John", chapters: [13] },
+      { name: "3 John", chapters: [14] },
+      { name: "Jude", chapters: [25] },
+      { name: "Revelation", chapters: [20,29,22,11,14,17,17,13,21,11,19,17,18,20,8,21,18,24,21,15,27,21] },
+    ];
+
+    // ── Verse Generation ──
+    function randomVerse() {
+      const book = BIBLE[Math.floor(Math.random() * BIBLE.length)];
+      const chapterIndex = Math.floor(Math.random() * book.chapters.length);
+      const chapter = chapterIndex + 1;
+      const verseNum = Math.floor(Math.random() * book.chapters[chapterIndex]) + 1;
+      return {
+        verse: `${book.name} ${chapter}:${verseNum}`,
+        book: book.name,
+        chapter,
+        verseNum
+      };
+    }
+
+    // ── Bible Sections ──
+    const BIBLE_SECTIONS = {
+      'Pentateuch': ['Genesis','Exodus','Leviticus','Numbers','Deuteronomy'],
+      'History': ['Joshua','Judges','Ruth','1 Samuel','2 Samuel','1 Kings','2 Kings','1 Chronicles','2 Chronicles','Ezra','Nehemiah','Esther'],
+      'Poetry': ['Job','Psalms','Proverbs','Ecclesiastes','Song of Solomon'],
+      'Major Prophets': ['Isaiah','Jeremiah','Lamentations','Ezekiel','Daniel'],
+      'Minor Prophets': ['Hosea','Joel','Amos','Obadiah','Jonah','Micah','Nahum','Habakkuk','Zephaniah','Haggai','Zechariah','Malachi'],
+      'Gospels & Acts': ['Matthew','Mark','Luke','John','Acts'],
+      'Epistles': ['Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians','Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon','Hebrews','James','1 Peter','2 Peter','1 John','2 John','3 John','Jude'],
+      'Revelation': ['Revelation']
+    };
+
+    function getSection(bookName) {
+      for (const [section, books] of Object.entries(BIBLE_SECTIONS)) {
+        if (books.includes(bookName)) return section;
+      }
+      return 'Unknown';
+    }
+
+    // ── IndexedDB ──
+    let db;
+
+    function initDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open('BibleVerseFinder', 1);
+        request.onupgradeneeded = (e) => {
+          const database = e.target.result;
+          const attempts = database.createObjectStore('attempts', { keyPath: 'id', autoIncrement: true });
+          attempts.createIndex('timestamp', 'timestamp');
+          attempts.createIndex('book', 'book');
+          attempts.createIndex('roundId', 'roundId');
+          const rounds = database.createObjectStore('rounds', { keyPath: 'id', autoIncrement: true });
+          rounds.createIndex('timestamp', 'timestamp');
+        };
+        request.onsuccess = (e) => { db = e.target.result; resolve(db); };
+        request.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    function saveRound(roundData) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('rounds', 'readwrite');
+        const request = tx.objectStore('rounds').add(roundData);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    function saveAttempts(attempts) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('attempts', 'readwrite');
+        const store = tx.objectStore('attempts');
+        attempts.forEach(a => store.add(a));
+        tx.oncomplete = () => resolve();
+        tx.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    function getAllRounds() {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('rounds', 'readonly');
+        const request = tx.objectStore('rounds').getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    function getAllAttempts() {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('attempts', 'readonly');
+        const request = tx.objectStore('attempts').getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    // ── Screen Navigation ──
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+    function goHome() { refreshHomeScreen(); showScreen('home-screen'); }
+    function refreshHomeScreen() { /* filled in by Task 5 */ }
+
+    // ── App Init ──
+    initDB().then(() => {
+      refreshHomeScreen();
+    });
+  </script>
+</body>
+</html>
