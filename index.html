@@ -12,8 +12,8 @@
       min-height: 100vh;
       color: #1E3A5F;
     }
-    .screen { display: none; min-height: 100vh; }
-    .screen.active { display: flex; flex-direction: column; }
+    .screen { display: none; min-height: 100vh; opacity: 0; transition: opacity 0.2s ease; }
+    .screen.active { display: flex; flex-direction: column; opacity: 1; }
 
     /* -- Home Screen -- */
     .home-header { padding: 32px 48px 0; }
@@ -81,6 +81,8 @@
     .summary-badge-name { font-size: 14px; font-weight: 600; color: #1A56DB; }
     .play-again-btn { background: #3B82F6; color: white; border: none; border-radius: 16px; padding: 18px 48px; font-size: 18px; font-weight: 700; cursor: pointer; margin-top: 16px; transition: transform 0.1s; }
     .play-again-btn:hover { transform: translateY(-2px); }
+    .badge { cursor: help; transition: transform 0.15s; }
+    .badge:hover { transform: scale(1.2); }
   </style>
 </head>
 <body>
@@ -320,7 +322,363 @@
       document.getElementById(id).classList.add('active');
     }
     function goHome() { refreshHomeScreen(); showScreen('home-screen'); }
-    function refreshHomeScreen() { /* filled in by Task 5 */ }
+
+    // ── Game State ──
+    let currentRound = { size: 0, verses: [], times: [], currentIndex: 0 };
+    let timerStart = 0;
+    let timerInterval = null;
+
+    // ── Encouragement Messages ──
+    const RESULT_MESSAGES = [
+      "Great job, Neha!", "You're getting faster!", "Keep it up, Neha!",
+      "Way to go!", "Awesome find, Neha!", "You're a natural!",
+      "Fantastic, Neha!", "God is proud of you!", "Keep shining, Neha!",
+      "You're doing amazing!", "That was quick!", "Nice work, Neha!"
+    ];
+
+    const SUMMARY_MESSAGES = [
+      "Awesome round, Neha! You're going to do great at Sunday school!",
+      "Practice makes perfect — keep going, Neha!",
+      "You're becoming a Bible navigation expert!",
+      "Neha, your hard work is really paying off!",
+      "Amazing dedication, Neha! Keep it up!",
+      "You're getting closer to mastering the Bible, Neha!"
+    ];
+
+    function randomFrom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    function startRound(size) {
+      currentRound = { size, verses: [], times: [], currentIndex: 0 };
+      for (let i = 0; i < size; i++) {
+        currentRound.verses.push(randomVerse());
+      }
+      showVerse();
+    }
+
+    function showVerse() {
+      const idx = currentRound.currentIndex;
+      const verse = currentRound.verses[idx];
+      const size = currentRound.size;
+
+      // Update progress bar
+      const progressBar = document.getElementById('progress-bar');
+      progressBar.innerHTML = '';
+      for (let i = 0; i < size; i++) {
+        const seg = document.createElement('div');
+        seg.className = 'progress-segment' + (i < idx ? ' done' : i === idx ? ' current' : '');
+        progressBar.appendChild(seg);
+      }
+
+      // Update verse display
+      document.getElementById('verse-reference').textContent = verse.verse;
+      document.getElementById('verse-count').textContent = `${idx + 1} / ${size}`;
+
+      // Update running stats
+      if (currentRound.times.length > 0) {
+        const avg = currentRound.times.reduce((a, b) => a + b, 0) / currentRound.times.length;
+        const best = Math.min(...currentRound.times);
+        document.getElementById('running-avg').textContent = formatTime(avg);
+        document.getElementById('running-best').textContent = formatTime(best);
+      } else {
+        document.getElementById('running-avg').textContent = '—';
+        document.getElementById('running-best').textContent = '—';
+      }
+
+      showScreen('verse-screen');
+
+      // Start timer
+      timerStart = performance.now();
+      const timerEl = document.getElementById('verse-timer');
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        const elapsed = performance.now() - timerStart;
+        timerEl.textContent = formatTimer(elapsed);
+      }, 100);
+    }
+
+    function formatTimer(ms) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function formatTime(ms) {
+      const s = ms / 1000;
+      return s < 60 ? `${Math.round(s)}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
+    }
+
+    async function foundIt() {
+      clearInterval(timerInterval);
+      const elapsed = performance.now() - timerStart;
+      currentRound.times.push(elapsed);
+
+      const timeStr = formatTime(elapsed);
+      document.getElementById('result-time').textContent = timeStr;
+
+      // Pick encouragement message
+      let message = randomFrom(RESULT_MESSAGES);
+      let comparison = '';
+
+      // Check against overall average
+      const allAttempts = await getAllAttempts();
+      if (allAttempts.length > 0) {
+        const overallAvg = allAttempts.reduce((sum, a) => sum + a.timeMs, 0) / allAttempts.length;
+        if (elapsed < overallAvg) {
+          comparison = `${formatTime(overallAvg - elapsed)} faster than your average!`;
+        }
+        const overallBest = Math.min(...allAttempts.map(a => a.timeMs));
+        if (elapsed < overallBest) {
+          message = "New personal best, Neha! You're on fire!";
+        }
+      }
+
+      document.getElementById('result-message').textContent = message;
+      document.getElementById('result-comparison').textContent = comparison;
+      showScreen('result-screen');
+
+      // Auto-advance after 2 seconds
+      setTimeout(() => {
+        currentRound.currentIndex++;
+        if (currentRound.currentIndex < currentRound.size) {
+          showVerse();
+        } else {
+          finishRound();
+        }
+      }, 2000);
+    }
+
+    async function finishRound() {
+      const times = currentRound.times;
+      const avgMs = times.reduce((a, b) => a + b, 0) / times.length;
+      const bestMs = Math.min(...times);
+      const worstMs = Math.max(...times);
+      const now = Date.now();
+
+      // Save round
+      const roundId = await saveRound({
+        size: currentRound.size,
+        averageMs: avgMs,
+        bestMs,
+        worstMs,
+        timestamp: now
+      });
+
+      // Save attempts
+      const attempts = currentRound.verses.map((v, i) => ({
+        verse: v.verse,
+        book: v.book,
+        chapter: v.chapter,
+        verseNum: v.verseNum,
+        timeMs: currentRound.times[i],
+        roundId,
+        timestamp: now
+      }));
+      await saveAttempts(attempts);
+
+      // Show summary
+      document.getElementById('summary-title').textContent = 'Awesome Round, Neha!';
+      document.getElementById('summary-encouragement').textContent = randomFrom(SUMMARY_MESSAGES);
+
+      // Round stats
+      const statsEl = document.getElementById('summary-stats');
+      statsEl.innerHTML = `
+        <div class="stat-card"><div class="stat-value blue">${formatTime(avgMs)}</div><div class="stat-label">Average</div></div>
+        <div class="stat-card"><div class="stat-value purple">${formatTime(bestMs)}</div><div class="stat-label">Best</div></div>
+        <div class="stat-card"><div class="stat-value green">${formatTime(worstMs)}</div><div class="stat-label">Slowest</div></div>
+      `;
+
+      // Compare to previous rounds
+      const allRounds = await getAllRounds();
+      const prevRounds = allRounds.filter(r => r.id !== roundId);
+      let comparisonText = '';
+      if (prevRounds.length > 0) {
+        const lastRound = prevRounds[prevRounds.length - 1];
+        const diff = lastRound.averageMs - avgMs;
+        if (diff > 0) {
+          comparisonText = `You're improving, Neha! ${formatTime(diff)} faster than your last round!`;
+        } else if (diff < 0) {
+          comparisonText = `Keep practicing, Neha — you'll beat your last time soon!`;
+        } else {
+          comparisonText = `Same pace as last time — consistency is great!`;
+        }
+      } else {
+        comparisonText = `Your first round ever — great start, Neha!`;
+      }
+      document.getElementById('summary-comparison').textContent = comparisonText;
+
+      // Check badges
+      await showNewBadges();
+
+      showScreen('summary-screen');
+    }
+
+    // ── Badges ──
+    const BADGE_DEFS = [
+      { id: 'first-steps',    icon: '🌟', name: 'First Steps',       desc: 'Complete your first round' },
+      { id: 'bookworm',       icon: '📚', name: 'Bookworm',          desc: 'Complete 10 rounds' },
+      { id: 'bible-scholar',  icon: '🎓', name: 'Bible Scholar',     desc: 'Complete 50 rounds' },
+      { id: 'speed-demon',    icon: '⚡', name: 'Speed Demon',       desc: 'Find a verse in under 10s' },
+      { id: 'lightning-fast', icon: '💨', name: 'Lightning Fast',    desc: 'Find a verse in under 5s' },
+      { id: 'consistent',     icon: '🔥', name: 'Consistent',        desc: '7-day streak' },
+      { id: 'devoted',        icon: '💎', name: 'Devoted',           desc: '30-day streak' },
+      { id: 'explorer',       icon: '🗺️', name: 'Explorer',          desc: 'Find verses in 20 different books' },
+      { id: 'ot-pro',         icon: '📜', name: 'Old Testament Pro', desc: 'Find verses in all 39 OT books' },
+      { id: 'nt-pro',         icon: '✝️', name: 'New Testament Pro', desc: 'Find verses in all 27 NT books' },
+      { id: 'master-nav',     icon: '👑', name: 'Master Navigator',  desc: 'Find verses in all 66 books' },
+    ];
+
+    // ── Levels ──
+    const LEVELS = [
+      { level: 1,  name: 'Beginner',        rounds: 0 },
+      { level: 2,  name: 'Learner',          rounds: 5 },
+      { level: 3,  name: 'Reader',           rounds: 15 },
+      { level: 4,  name: 'Explorer',         rounds: 30 },
+      { level: 5,  name: 'Scholar',          rounds: 50 },
+      { level: 6,  name: 'Expert',           rounds: 80 },
+      { level: 7,  name: 'Master',           rounds: 120 },
+      { level: 8,  name: 'Champion',         rounds: 170 },
+      { level: 9,  name: 'Legend',           rounds: 230 },
+      { level: 10, name: 'Bible Navigator',  rounds: 300 },
+    ];
+
+    function calcStreak(rounds) {
+      if (rounds.length === 0) return 0;
+      const days = [...new Set(rounds.map(r => new Date(r.timestamp).toDateString()))].sort((a, b) => new Date(b) - new Date(a));
+      const today = new Date().toDateString();
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      if (days[0] !== today && days[0] !== yesterday) return 0;
+      let streak = 1;
+      for (let i = 0; i < days.length - 1; i++) {
+        const curr = new Date(days[i]);
+        const prev = new Date(days[i + 1]);
+        const diff = (curr - prev) / 86400000;
+        if (Math.round(diff) === 1) streak++;
+        else break;
+      }
+      return streak;
+    }
+
+    function calcLevel(totalRounds) {
+      let current = LEVELS[0];
+      for (const lvl of LEVELS) {
+        if (totalRounds >= lvl.rounds) current = lvl;
+        else break;
+      }
+      const next = LEVELS.find(l => l.rounds > totalRounds);
+      const progress = next
+        ? (totalRounds - current.rounds) / (next.rounds - current.rounds) * 100
+        : 100;
+      return { ...current, progress: Math.min(100, progress) };
+    }
+
+    function calcBadges(rounds, attempts, streak) {
+      const totalRounds = rounds.length;
+      const uniqueBooks = new Set(attempts.map(a => a.book));
+      const otBooks = new Set(BIBLE.slice(0, 39).map(b => b.name));
+      const ntBooks = new Set(BIBLE.slice(39).map(b => b.name));
+      const foundOT = [...otBooks].filter(b => uniqueBooks.has(b));
+      const foundNT = [...ntBooks].filter(b => uniqueBooks.has(b));
+      const fastestMs = attempts.length > 0 ? Math.min(...attempts.map(a => a.timeMs)) : Infinity;
+
+      const earned = new Set();
+      if (totalRounds >= 1) earned.add('first-steps');
+      if (totalRounds >= 10) earned.add('bookworm');
+      if (totalRounds >= 50) earned.add('bible-scholar');
+      if (fastestMs < 10000) earned.add('speed-demon');
+      if (fastestMs < 5000) earned.add('lightning-fast');
+      if (streak >= 7) earned.add('consistent');
+      if (streak >= 30) earned.add('devoted');
+      if (uniqueBooks.size >= 20) earned.add('explorer');
+      if (foundOT.length >= 39) earned.add('ot-pro');
+      if (foundNT.length >= 27) earned.add('nt-pro');
+      if (uniqueBooks.size >= 66) earned.add('master-nav');
+
+      return earned;
+    }
+
+    async function showNewBadges() {
+      const rounds = await getAllRounds();
+      const attempts = await getAllAttempts();
+      const streak = calcStreak(rounds);
+      const earned = calcBadges(rounds, attempts, streak);
+
+      // Determine which badges are new
+      const prevRounds = rounds.slice(0, -1);
+      const prevAttempts = attempts.filter(a => a.roundId !== rounds[rounds.length - 1]?.id);
+      const prevStreak = calcStreak(prevRounds);
+      const prevEarned = calcBadges(prevRounds, prevAttempts, prevStreak);
+
+      const newBadges = [...earned].filter(id => !prevEarned.has(id));
+      const container = document.getElementById('summary-badges');
+      container.innerHTML = '';
+
+      for (const id of newBadges) {
+        const badge = BADGE_DEFS.find(b => b.id === id);
+        const el = document.createElement('div');
+        el.className = 'summary-badge';
+        el.innerHTML = `<span class="summary-badge-icon">${badge.icon}</span><span class="summary-badge-name">${badge.name}</span>`;
+        container.appendChild(el);
+      }
+    }
+
+    async function refreshHomeScreen() {
+      const rounds = await getAllRounds();
+      const attempts = await getAllAttempts();
+      const streak = calcStreak(rounds);
+      const level = calcLevel(rounds.length);
+      const earned = calcBadges(rounds, attempts, streak);
+
+      // Welcome message
+      document.getElementById('home-welcome').textContent =
+        rounds.length > 0 ? 'Welcome back, Neha!' : 'Welcome, Neha!';
+
+      // Streak
+      const streakEl = document.getElementById('streak-banner');
+      if (streak > 0) {
+        streakEl.textContent = `🔥 ${streak} day streak! ${streak >= 5 ? 'Amazing dedication!' : 'Keep it going!'}`;
+      } else if (rounds.length > 0) {
+        streakEl.textContent = 'Start a round today to begin a new streak!';
+      } else {
+        streakEl.textContent = 'Ready for your first round, Neha?';
+      }
+
+      // Level
+      document.getElementById('level-label').textContent =
+        `Level ${level.level} · ${level.name}`;
+      document.getElementById('level-bar-fill').style.width = `${level.progress}%`;
+
+      // Stats
+      if (attempts.length > 0) {
+        const bestMs = Math.min(...attempts.map(a => a.timeMs));
+        const avgMs = attempts.reduce((sum, a) => sum + a.timeMs, 0) / attempts.length;
+        document.getElementById('stat-best').textContent = formatTime(bestMs);
+        document.getElementById('stat-avg').textContent = formatTime(avgMs);
+      } else {
+        document.getElementById('stat-best').textContent = '—';
+        document.getElementById('stat-avg').textContent = '—';
+      }
+      document.getElementById('stat-rounds').textContent = rounds.length;
+
+      // Badges
+      const grid = document.getElementById('badges-grid');
+      grid.innerHTML = '';
+      for (const badge of BADGE_DEFS) {
+        const el = document.createElement('div');
+        el.className = 'badge' + (earned.has(badge.id) ? '' : ' locked');
+        el.textContent = badge.icon;
+        el.title = `${badge.name}: ${badge.desc}`;
+        grid.appendChild(el);
+      }
+    }
+
+    // ── Keyboard Support ──
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && document.getElementById('verse-screen').classList.contains('active')) {
+        e.preventDefault();
+        foundIt();
+      }
+    });
 
     // ── App Init ──
     initDB().then(() => {
