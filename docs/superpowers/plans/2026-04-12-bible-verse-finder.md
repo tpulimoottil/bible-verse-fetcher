@@ -1,0 +1,998 @@
+# Bible Verse Finder Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Build a single-file HTML app that drills Bible verse lookup speed for Neha, with timer, stats tracking via IndexedDB, and gamification.
+
+**Architecture:** Single `index.html` file with inline CSS and JS. Four screens (home, verse, result-flash, round-summary) implemented as `<div>` containers that show/hide. IndexedDB stores all attempts and rounds persistently. Bible verse data (all 66 books with chapter/verse counts) embedded as a JS object.
+
+**Tech Stack:** HTML, CSS, vanilla JavaScript, IndexedDB. No dependencies.
+
+**Spec:** `docs/superpowers/specs/2026-04-12-bible-verse-finder-design.md`
+
+---
+
+## File Structure
+
+Single file: `index.html`
+
+Internal sections:
+1. CSS — all styles (Cool & Playful theme: blues, purples, greens on light blue gradient)
+2. HTML — four screen containers (`#home-screen`, `#verse-screen`, `#result-screen`, `#summary-screen`)
+3. JS — Bible data, IndexedDB, game logic, gamification, UI rendering
+
+---
+
+### Task 1: HTML skeleton with CSS and screen navigation
+
+**Files:**
+- Create: `index.html`
+
+This task creates the complete HTML structure with all four screens, the full CSS theme, and the screen-switching logic. No game logic yet — just the visual shell.
+
+- [ ] **Step 1: Create index.html with DOCTYPE, head, and CSS**
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bible Verse Finder — Neha</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #E8F4FD 0%, #D1ECFF 100%);
+      min-height: 100vh;
+      color: #1E3A5F;
+    }
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: flex; flex-direction: column; }
+
+    /* -- Home Screen -- */
+    .home-header { padding: 32px 48px 0; }
+    .home-header h1 { font-size: 28px; font-weight: 700; color: #1A56DB; }
+    .home-welcome { font-size: 18px; color: #6B8FD4; margin-top: 4px; }
+    .home-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 48px; gap: 32px; }
+    .streak-banner { font-size: 16px; color: #8B5CF6; font-weight: 600; }
+    .level-bar-container { width: 100%; max-width: 500px; }
+    .level-label { font-size: 14px; color: #6B8FD4; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+    .level-bar { background: #E2E8F0; border-radius: 8px; height: 12px; overflow: hidden; }
+    .level-bar-fill { background: linear-gradient(90deg, #3B82F6, #8B5CF6); height: 100%; border-radius: 8px; transition: width 0.5s ease; }
+    .stats-row { display: flex; gap: 16px; }
+    .stat-card { background: white; border-radius: 16px; padding: 20px 32px; text-align: center; box-shadow: 0 2px 12px rgba(26,86,219,0.08); min-width: 140px; }
+    .stat-value { font-size: 28px; font-weight: 700; }
+    .stat-value.blue { color: #3B82F6; }
+    .stat-value.purple { color: #8B5CF6; }
+    .stat-value.green { color: #10B981; }
+    .stat-label { font-size: 13px; color: #6B8FD4; margin-top: 4px; }
+    .badges-section { width: 100%; max-width: 700px; }
+    .badges-title { font-size: 14px; color: #6B8FD4; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; text-align: center; }
+    .badges-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+    .badge { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; background: white; box-shadow: 0 2px 8px rgba(26,86,219,0.08); }
+    .badge.locked { opacity: 0.3; filter: grayscale(1); }
+    .round-buttons { display: flex; gap: 16px; margin-top: 8px; }
+    .round-btn { border: none; color: white; border-radius: 16px; padding: 18px 40px; font-size: 18px; font-weight: 700; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; }
+    .round-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(59,130,246,0.3); }
+    .round-btn:active { transform: translateY(0); }
+    .round-btn.blue { background: #3B82F6; }
+    .round-btn.purple { background: #8B5CF6; }
+    .round-btn.green { background: #10B981; }
+
+    /* -- Verse Screen -- */
+    .verse-topbar { display: flex; justify-content: space-between; align-items: center; padding: 20px 48px; }
+    .verse-topbar-left { font-size: 16px; font-weight: 600; color: #1A56DB; }
+    .verse-topbar-right { display: flex; gap: 24px; align-items: center; font-size: 13px; color: #6B8FD4; }
+    .verse-topbar-right strong { color: #3B82F6; }
+    .progress-bar { display: flex; gap: 4px; padding: 0 48px; }
+    .progress-segment { flex: 1; height: 6px; border-radius: 3px; background: #E2E8F0; transition: background 0.3s; }
+    .progress-segment.done { background: #3B82F6; }
+    .progress-segment.current { background: #8B5CF6; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .verse-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+    .verse-reference { font-size: 64px; font-weight: 800; color: #1A56DB; text-align: center; line-height: 1.1; }
+    .verse-subtitle { font-size: 16px; color: #6B8FD4; }
+    .verse-timer { font-size: 88px; font-weight: 800; color: #8B5CF6; font-variant-numeric: tabular-nums; letter-spacing: 2px; margin: 24px 0; }
+    .found-btn { background: #3B82F6; color: white; border: none; border-radius: 16px; padding: 20px 80px; font-size: 22px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 16px rgba(59,130,246,0.3); transition: transform 0.1s, box-shadow 0.1s; }
+    .found-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(59,130,246,0.4); }
+    .found-btn:active { transform: translateY(0); }
+
+    /* -- Result Flash -- */
+    .result-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+    .result-time { font-size: 72px; font-weight: 800; color: #10B981; }
+    .result-message { font-size: 22px; color: #1A56DB; font-weight: 600; }
+    .result-comparison { font-size: 16px; color: #6B8FD4; }
+
+    /* -- Round Summary -- */
+    .summary-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px; gap: 24px; }
+    .summary-title { font-size: 36px; font-weight: 800; color: #1A56DB; }
+    .summary-encouragement { font-size: 18px; color: #6B8FD4; text-align: center; max-width: 500px; }
+    .summary-stats { display: flex; gap: 16px; }
+    .summary-comparison { font-size: 16px; color: #8B5CF6; font-weight: 600; }
+    .summary-badges { display: flex; gap: 12px; margin-top: 8px; }
+    .summary-badge { display: flex; align-items: center; gap: 8px; background: white; border-radius: 12px; padding: 12px 20px; box-shadow: 0 2px 12px rgba(26,86,219,0.08); }
+    .summary-badge-icon { font-size: 24px; }
+    .summary-badge-name { font-size: 14px; font-weight: 600; color: #1A56DB; }
+    .play-again-btn { background: #3B82F6; color: white; border: none; border-radius: 16px; padding: 18px 48px; font-size: 18px; font-weight: 700; cursor: pointer; margin-top: 16px; transition: transform 0.1s; }
+    .play-again-btn:hover { transform: translateY(-2px); }
+  </style>
+</head>
+```
+
+- [ ] **Step 2: Add the four screen HTML containers**
+
+Add after `</head>`:
+
+```html
+<body>
+  <!-- HOME SCREEN -->
+  <div id="home-screen" class="screen active">
+    <div class="home-header">
+      <h1>Bible Verse Finder</h1>
+      <div class="home-welcome" id="home-welcome">Welcome, Neha!</div>
+    </div>
+    <div class="home-body">
+      <div class="streak-banner" id="streak-banner"></div>
+      <div class="level-bar-container">
+        <div class="level-label" id="level-label">Level 1 · Beginner</div>
+        <div class="level-bar"><div class="level-bar-fill" id="level-bar-fill" style="width: 0%"></div></div>
+      </div>
+      <div class="stats-row" id="stats-row">
+        <div class="stat-card"><div class="stat-value purple" id="stat-best">—</div><div class="stat-label">Best Time</div></div>
+        <div class="stat-card"><div class="stat-value blue" id="stat-avg">—</div><div class="stat-label">Average</div></div>
+        <div class="stat-card"><div class="stat-value green" id="stat-rounds">0</div><div class="stat-label">Rounds</div></div>
+      </div>
+      <div class="badges-section">
+        <div class="badges-title">Badges</div>
+        <div class="badges-grid" id="badges-grid"></div>
+      </div>
+      <div class="round-buttons">
+        <button class="round-btn blue" onclick="startRound(5)">5 Verses</button>
+        <button class="round-btn purple" onclick="startRound(10)">10 Verses</button>
+        <button class="round-btn green" onclick="startRound(20)">20 Verses</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VERSE SCREEN -->
+  <div id="verse-screen" class="screen">
+    <div class="verse-topbar">
+      <div class="verse-topbar-left">Bible Verse Finder</div>
+      <div class="verse-topbar-right">
+        <span>Avg: <strong id="running-avg">—</strong></span>
+        <span>Best: <strong id="running-best">—</strong></span>
+        <span id="verse-count">1 / 5</span>
+      </div>
+    </div>
+    <div class="progress-bar" id="progress-bar"></div>
+    <div class="verse-body">
+      <div class="verse-reference" id="verse-reference">Genesis 1:1</div>
+      <div class="verse-subtitle">Find this verse in your Bible!</div>
+      <div class="verse-timer" id="verse-timer">00:00</div>
+      <button class="found-btn" onclick="foundIt()">Found It!</button>
+    </div>
+  </div>
+
+  <!-- RESULT FLASH -->
+  <div id="result-screen" class="screen">
+    <div class="result-body">
+      <div class="result-time" id="result-time">12s</div>
+      <div class="result-message" id="result-message">Great job, Neha!</div>
+      <div class="result-comparison" id="result-comparison"></div>
+    </div>
+  </div>
+
+  <!-- ROUND SUMMARY -->
+  <div id="summary-screen" class="screen">
+    <div class="summary-body">
+      <div class="summary-title" id="summary-title">Awesome Round!</div>
+      <div class="summary-encouragement" id="summary-encouragement"></div>
+      <div class="summary-stats" id="summary-stats"></div>
+      <div class="summary-comparison" id="summary-comparison"></div>
+      <div class="summary-badges" id="summary-badges"></div>
+      <button class="play-again-btn" onclick="goHome()">Play Again</button>
+    </div>
+  </div>
+```
+
+- [ ] **Step 3: Add screen-switching JS and close body/html**
+
+Add after the summary screen div:
+
+```html
+  <script>
+    // ── Screen Navigation ──
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+    function goHome() { refreshHomeScreen(); showScreen('home-screen'); }
+    function refreshHomeScreen() { /* filled in later tasks */ }
+  </script>
+</body>
+</html>
+```
+
+- [ ] **Step 4: Open in browser to verify**
+
+Run: `open index.html`
+
+Expected: Home screen appears with blue gradient background, "Bible Verse Finder" title, "Welcome, Neha!", stat cards showing dashes, empty badges area, and three round-size buttons.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add index.html
+git commit -m "feat: add HTML skeleton with CSS theme and screen navigation"
+```
+
+---
+
+### Task 2: Bible verse data and random verse generation
+
+**Files:**
+- Modify: `index.html` (add to `<script>` block)
+
+Embed the complete Bible verse count data (66 books, ~1,200 chapters) and the random verse generator function.
+
+- [ ] **Step 1: Add Bible data object**
+
+Add at the top of the `<script>` block (before the screen navigation code). This is the complete verse count data for all 66 books of the Protestant Bible. Each book maps to an array of verse counts per chapter (index 0 = chapter 1).
+
+```javascript
+    // ── Bible Data (66 books, verse counts per chapter) ──
+    const BIBLE = [
+      { name: "Genesis", chapters: [31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,38,18,34,24,20,67,34,35,46,22,35,43,55,32,20,31,29,43,36,30,23,23,57,38,34,34,28,34,31,22,33,26] },
+      { name: "Exodus", chapters: [22,25,22,31,23,30,25,32,35,29,10,51,22,31,27,36,16,27,25,26,36,31,33,18,40,37,21,43,46,38,18,35,23,35,35,38,29,31,43,38] },
+      { name: "Leviticus", chapters: [17,16,17,35,19,30,38,36,24,20,47,8,59,57,33,34,16,30,37,27,24,33,44,23,55,46,34] },
+      { name: "Numbers", chapters: [54,34,51,49,31,27,89,26,23,36,35,16,33,45,41,50,13,32,22,29,35,41,30,25,18,65,23,31,40,16,54,42,56,29,34,13] },
+      { name: "Deuteronomy", chapters: [46,37,29,49,33,25,26,20,29,22,32,32,18,29,23,22,20,22,21,20,23,30,25,22,19,19,26,68,29,20,30,52,29,12] },
+      { name: "Joshua", chapters: [18,24,17,24,15,27,26,35,27,43,23,24,33,15,63,10,18,28,51,9,45,34,16,33] },
+      { name: "Judges", chapters: [36,23,31,24,31,40,25,35,57,18,40,15,25,20,20,31,13,31,30,48,25] },
+      { name: "Ruth", chapters: [22,23,18,22] },
+      { name: "1 Samuel", chapters: [28,36,21,22,12,21,17,22,27,27,15,25,23,52,35,23,58,30,24,43,15,23,28,23,44,25,12,25,11,31,13] },
+      { name: "2 Samuel", chapters: [27,32,39,12,25,23,29,18,13,19,27,31,39,33,37,23,29,33,43,26,22,51,39,25] },
+      { name: "1 Kings", chapters: [53,46,28,34,18,38,51,66,28,29,43,33,34,31,34,34,24,46,21,43,29,53] },
+      { name: "2 Kings", chapters: [18,25,27,44,27,33,20,29,37,36,21,21,25,29,38,20,41,37,37,21,26,20,37,20,30] },
+      { name: "1 Chronicles", chapters: [54,55,24,43,26,81,40,40,44,14,47,40,14,17,29,43,27,17,19,8,30,19,32,31,31,32,34,21,30] },
+      { name: "2 Chronicles", chapters: [17,18,17,22,14,42,22,18,31,19,23,16,22,15,19,14,19,34,11,37,20,12,21,27,28,23,9,27,36,27,21,33,25,33,27,23] },
+      { name: "Ezra", chapters: [11,70,13,24,17,22,28,36,15,44] },
+      { name: "Nehemiah", chapters: [11,20,32,23,19,19,73,18,38,39,36,47,31] },
+      { name: "Esther", chapters: [22,23,15,17,14,14,10,17,32,3] },
+      { name: "Job", chapters: [22,13,26,21,27,30,21,22,35,22,20,25,28,22,35,22,16,21,29,29,34,30,17,25,6,14,23,28,25,31,40,22,33,37,16,33,24,41,30,24,34,17] },
+      { name: "Psalms", chapters: [6,12,8,8,12,10,17,9,20,18,7,8,6,7,5,11,15,50,14,9,13,31,6,10,22,12,14,9,11,12,24,11,22,22,28,12,40,22,13,17,13,11,5,26,17,11,9,14,20,23,19,9,6,7,23,13,11,11,17,12,8,12,11,10,13,20,7,35,36,5,24,20,28,23,10,12,20,72,13,19,16,8,18,12,13,17,7,18,52,17,16,15,5,23,11,13,12,9,9,5,8,28,22,35,45,48,43,13,31,7,10,10,9,8,18,19,2,29,176,7,8,9,4,8,5,6,5,6,8,8,3,18,3,3,21,26,9,8,24,13,10,7,12,15,21,10,20,14,9,6] },
+      { name: "Proverbs", chapters: [33,22,35,27,23,35,27,36,18,32,31,28,25,35,33,33,28,24,29,30,31,29,35,34,28,28,27,28,27,33,31] },
+      { name: "Ecclesiastes", chapters: [18,26,22,16,20,12,29,17,18,20,10,14] },
+      { name: "Song of Solomon", chapters: [17,17,11,16,16,13,13,14] },
+      { name: "Isaiah", chapters: [31,22,26,6,30,13,25,22,21,34,16,6,22,32,9,14,14,7,25,6,17,25,18,23,12,21,13,29,24,33,9,20,24,17,10,22,38,22,8,31,29,25,28,28,25,13,15,22,26,11,23,15,12,17,13,12,21,14,21,22,11,12,19,12,25,24] },
+      { name: "Jeremiah", chapters: [19,37,25,31,31,30,34,22,26,25,23,17,27,22,21,21,27,23,15,18,14,30,40,10,38,24,22,17,32,24,40,44,26,22,19,32,21,28,18,16,18,22,13,30,5,28,7,47,39,46,64,34] },
+      { name: "Lamentations", chapters: [22,22,66,22,22] },
+      { name: "Ezekiel", chapters: [28,10,27,17,17,14,27,18,11,22,25,28,23,23,8,63,24,32,14,49,32,31,49,27,17,21,36,26,21,26,18,32,33,31,15,38,28,23,29,49,26,20,27,31,25,24,23,35] },
+      { name: "Daniel", chapters: [21,49,30,37,31,28,28,27,27,21,45,13] },
+      { name: "Hosea", chapters: [11,23,5,19,15,11,16,14,17,15,12,14,16,9] },
+      { name: "Joel", chapters: [20,32,21] },
+      { name: "Amos", chapters: [15,16,15,13,27,14,17,14,15] },
+      { name: "Obadiah", chapters: [21] },
+      { name: "Jonah", chapters: [17,10,10,11] },
+      { name: "Micah", chapters: [16,13,12,13,15,16,20] },
+      { name: "Nahum", chapters: [15,13,19] },
+      { name: "Habakkuk", chapters: [17,20,19] },
+      { name: "Zephaniah", chapters: [18,15,20] },
+      { name: "Haggai", chapters: [15,23] },
+      { name: "Zechariah", chapters: [21,13,10,14,11,15,14,23,17,12,17,14,9,21] },
+      { name: "Malachi", chapters: [14,17,18,6] },
+      { name: "Matthew", chapters: [25,23,17,25,48,34,29,34,38,42,30,50,58,36,39,28,27,35,30,34,46,46,39,51,46,75,66,20] },
+      { name: "Mark", chapters: [45,28,35,41,43,56,37,38,50,52,33,44,37,72,47,20] },
+      { name: "Luke", chapters: [80,52,38,44,39,49,50,56,62,42,54,59,35,35,32,31,37,43,48,47,38,71,56,53] },
+      { name: "John", chapters: [51,25,36,54,47,71,53,59,41,42,57,50,38,31,27,33,26,40,42,31,25] },
+      { name: "Acts", chapters: [26,47,26,37,42,15,60,40,43,48,30,25,52,28,41,40,34,28,41,38,40,30,35,27,27,32,44,31] },
+      { name: "Romans", chapters: [32,29,31,25,21,23,25,39,33,21,36,21,14,23,33,27] },
+      { name: "1 Corinthians", chapters: [31,16,23,21,13,20,40,13,27,33,34,31,13,40,58,10] },
+      { name: "2 Corinthians", chapters: [24,17,18,18,21,18,16,24,15,18,33,21,14] },
+      { name: "Galatians", chapters: [24,21,29,31,26,18] },
+      { name: "Ephesians", chapters: [23,22,21,32,33,24] },
+      { name: "Philippians", chapters: [30,30,21,23] },
+      { name: "Colossians", chapters: [29,23,25,18] },
+      { name: "1 Thessalonians", chapters: [10,20,13,18,28] },
+      { name: "2 Thessalonians", chapters: [12,17,18] },
+      { name: "1 Timothy", chapters: [20,15,16,16,25,21] },
+      { name: "2 Timothy", chapters: [18,26,17,22] },
+      { name: "Titus", chapters: [16,15,15] },
+      { name: "Philemon", chapters: [25] },
+      { name: "Hebrews", chapters: [14,18,19,16,14,20,28,13,28,39,40,29,25] },
+      { name: "James", chapters: [27,26,18,17,20] },
+      { name: "1 Peter", chapters: [25,25,22,19,14] },
+      { name: "2 Peter", chapters: [21,22,18] },
+      { name: "1 John", chapters: [10,29,24,21,21] },
+      { name: "2 John", chapters: [13] },
+      { name: "3 John", chapters: [14] },
+      { name: "Jude", chapters: [25] },
+      { name: "Revelation", chapters: [20,29,22,11,14,17,17,13,21,11,19,17,18,20,8,21,18,24,21,15,27,21] },
+    ];
+```
+
+- [ ] **Step 2: Add random verse generator and Bible section classifier**
+
+Add after the BIBLE data:
+
+```javascript
+    // ── Verse Generation ──
+    function randomVerse() {
+      const book = BIBLE[Math.floor(Math.random() * BIBLE.length)];
+      const chapterIndex = Math.floor(Math.random() * book.chapters.length);
+      const chapter = chapterIndex + 1;
+      const verseNum = Math.floor(Math.random() * book.chapters[chapterIndex]) + 1;
+      return {
+        verse: `${book.name} ${chapter}:${verseNum}`,
+        book: book.name,
+        chapter,
+        verseNum
+      };
+    }
+
+    // ── Bible Sections ──
+    const BIBLE_SECTIONS = {
+      'Pentateuch': ['Genesis','Exodus','Leviticus','Numbers','Deuteronomy'],
+      'History': ['Joshua','Judges','Ruth','1 Samuel','2 Samuel','1 Kings','2 Kings','1 Chronicles','2 Chronicles','Ezra','Nehemiah','Esther'],
+      'Poetry': ['Job','Psalms','Proverbs','Ecclesiastes','Song of Solomon'],
+      'Major Prophets': ['Isaiah','Jeremiah','Lamentations','Ezekiel','Daniel'],
+      'Minor Prophets': ['Hosea','Joel','Amos','Obadiah','Jonah','Micah','Nahum','Habakkuk','Zephaniah','Haggai','Zechariah','Malachi'],
+      'Gospels & Acts': ['Matthew','Mark','Luke','John','Acts'],
+      'Epistles': ['Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians','Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon','Hebrews','James','1 Peter','2 Peter','1 John','2 John','3 John','Jude'],
+      'Revelation': ['Revelation']
+    };
+
+    function getSection(bookName) {
+      for (const [section, books] of Object.entries(BIBLE_SECTIONS)) {
+        if (books.includes(bookName)) return section;
+      }
+      return 'Unknown';
+    }
+```
+
+- [ ] **Step 3: Verify in browser console**
+
+Open `index.html`, open browser DevTools console, and run:
+
+```
+randomVerse()
+```
+
+Expected: Returns an object like `{verse: "Psalms 119:105", book: "Psalms", chapter: 119, verseNum: 105}`. Run it several times to check variety. Verify no verse numbers exceed chapter length by running:
+
+```
+for (let i = 0; i < 1000; i++) { const v = randomVerse(); const book = BIBLE.find(b => b.name === v.book); if (v.verseNum > book.chapters[v.chapter - 1]) console.error('BAD:', v); }
+```
+
+Expected: No errors logged.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add index.html
+git commit -m "feat: add Bible verse data (66 books) and random verse generator"
+```
+
+---
+
+### Task 3: IndexedDB setup and data helpers
+
+**Files:**
+- Modify: `index.html` (add to `<script>` block)
+
+Set up the IndexedDB database with `attempts` and `rounds` object stores, plus helper functions for saving and querying data.
+
+- [ ] **Step 1: Add IndexedDB initialization**
+
+Add after the Bible sections code:
+
+```javascript
+    // ── IndexedDB ──
+    let db;
+
+    function initDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open('BibleVerseFinder', 1);
+        request.onupgradeneeded = (e) => {
+          const database = e.target.result;
+          const attempts = database.createObjectStore('attempts', { keyPath: 'id', autoIncrement: true });
+          attempts.createIndex('timestamp', 'timestamp');
+          attempts.createIndex('book', 'book');
+          attempts.createIndex('roundId', 'roundId');
+          const rounds = database.createObjectStore('rounds', { keyPath: 'id', autoIncrement: true });
+          rounds.createIndex('timestamp', 'timestamp');
+        };
+        request.onsuccess = (e) => { db = e.target.result; resolve(db); };
+        request.onerror = (e) => reject(e.target.error);
+      });
+    }
+```
+
+- [ ] **Step 2: Add data save helpers**
+
+```javascript
+    function saveRound(roundData) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('rounds', 'readwrite');
+        const request = tx.objectStore('rounds').add(roundData);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    function saveAttempts(attempts) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('attempts', 'readwrite');
+        const store = tx.objectStore('attempts');
+        attempts.forEach(a => store.add(a));
+        tx.oncomplete = () => resolve();
+        tx.onerror = (e) => reject(e.target.error);
+      });
+    }
+```
+
+- [ ] **Step 3: Add data query helpers**
+
+```javascript
+    function getAllRounds() {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('rounds', 'readonly');
+        const request = tx.objectStore('rounds').getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    function getAllAttempts() {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('attempts', 'readonly');
+        const request = tx.objectStore('attempts').getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = (e) => reject(e.target.error);
+      });
+    }
+```
+
+- [ ] **Step 4: Add app initialization that opens DB on page load**
+
+```javascript
+    // ── App Init ──
+    initDB().then(() => {
+      refreshHomeScreen();
+    });
+```
+
+- [ ] **Step 5: Verify in browser console**
+
+Open `index.html`, open DevTools > Application > IndexedDB. Verify `BibleVerseFinder` database exists with `attempts` and `rounds` object stores.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add index.html
+git commit -m "feat: add IndexedDB setup with attempts and rounds stores"
+```
+
+---
+
+### Task 4: Game loop — timer, round flow, and data recording
+
+**Files:**
+- Modify: `index.html` (add to `<script>` block)
+
+Implement the core gameplay: starting a round, showing verses with a running timer, recording attempts, and transitioning between screens.
+
+- [ ] **Step 1: Add game state variables and encouragement messages**
+
+Add after the DB helpers:
+
+```javascript
+    // ── Game State ──
+    let currentRound = { size: 0, verses: [], times: [], currentIndex: 0 };
+    let timerStart = 0;
+    let timerInterval = null;
+
+    // ── Encouragement Messages ──
+    const RESULT_MESSAGES = [
+      "Great job, Neha!", "You're getting faster!", "Keep it up, Neha!",
+      "Way to go!", "Awesome find, Neha!", "You're a natural!",
+      "Fantastic, Neha!", "God is proud of you!", "Keep shining, Neha!",
+      "You're doing amazing!", "That was quick!", "Nice work, Neha!"
+    ];
+
+    const SUMMARY_MESSAGES = [
+      "Awesome round, Neha! You're going to do great at Sunday school!",
+      "Practice makes perfect — keep going, Neha!",
+      "You're becoming a Bible navigation expert!",
+      "Neha, your hard work is really paying off!",
+      "Amazing dedication, Neha! Keep it up!",
+      "You're getting closer to mastering the Bible, Neha!"
+    ];
+
+    function randomFrom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+```
+
+- [ ] **Step 2: Add startRound function**
+
+```javascript
+    function startRound(size) {
+      currentRound = { size, verses: [], times: [], currentIndex: 0 };
+      for (let i = 0; i < size; i++) {
+        currentRound.verses.push(randomVerse());
+      }
+      showVerse();
+    }
+```
+
+- [ ] **Step 3: Add showVerse function with timer and progress bar**
+
+```javascript
+    function showVerse() {
+      const idx = currentRound.currentIndex;
+      const verse = currentRound.verses[idx];
+      const size = currentRound.size;
+
+      // Update progress bar
+      const progressBar = document.getElementById('progress-bar');
+      progressBar.innerHTML = '';
+      for (let i = 0; i < size; i++) {
+        const seg = document.createElement('div');
+        seg.className = 'progress-segment' + (i < idx ? ' done' : i === idx ? ' current' : '');
+        progressBar.appendChild(seg);
+      }
+
+      // Update verse display
+      document.getElementById('verse-reference').textContent = verse.verse;
+      document.getElementById('verse-count').textContent = `${idx + 1} / ${size}`;
+
+      // Update running stats
+      if (currentRound.times.length > 0) {
+        const avg = currentRound.times.reduce((a, b) => a + b, 0) / currentRound.times.length;
+        const best = Math.min(...currentRound.times);
+        document.getElementById('running-avg').textContent = formatTime(avg);
+        document.getElementById('running-best').textContent = formatTime(best);
+      } else {
+        document.getElementById('running-avg').textContent = '—';
+        document.getElementById('running-best').textContent = '—';
+      }
+
+      showScreen('verse-screen');
+
+      // Start timer
+      timerStart = performance.now();
+      const timerEl = document.getElementById('verse-timer');
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        const elapsed = performance.now() - timerStart;
+        timerEl.textContent = formatTimer(elapsed);
+      }, 100);
+    }
+
+    function formatTimer(ms) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function formatTime(ms) {
+      const s = ms / 1000;
+      return s < 60 ? `${Math.round(s)}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
+    }
+```
+
+- [ ] **Step 4: Add foundIt function and result flash**
+
+```javascript
+    async function foundIt() {
+      clearInterval(timerInterval);
+      const elapsed = performance.now() - timerStart;
+      currentRound.times.push(elapsed);
+
+      const timeStr = formatTime(elapsed);
+      document.getElementById('result-time').textContent = timeStr;
+
+      // Pick encouragement message
+      let message = randomFrom(RESULT_MESSAGES);
+      let comparison = '';
+
+      // Check against overall average
+      const allAttempts = await getAllAttempts();
+      if (allAttempts.length > 0) {
+        const overallAvg = allAttempts.reduce((sum, a) => sum + a.timeMs, 0) / allAttempts.length;
+        if (elapsed < overallAvg) {
+          comparison = `${formatTime(overallAvg - elapsed)} faster than your average!`;
+        }
+        const overallBest = Math.min(...allAttempts.map(a => a.timeMs));
+        if (elapsed < overallBest) {
+          message = "New personal best, Neha! You're on fire!";
+        }
+      }
+
+      document.getElementById('result-message').textContent = message;
+      document.getElementById('result-comparison').textContent = comparison;
+      showScreen('result-screen');
+
+      // Auto-advance after 2 seconds
+      setTimeout(() => {
+        currentRound.currentIndex++;
+        if (currentRound.currentIndex < currentRound.size) {
+          showVerse();
+        } else {
+          finishRound();
+        }
+      }, 2000);
+    }
+```
+
+- [ ] **Step 5: Add finishRound function**
+
+```javascript
+    async function finishRound() {
+      const times = currentRound.times;
+      const avgMs = times.reduce((a, b) => a + b, 0) / times.length;
+      const bestMs = Math.min(...times);
+      const worstMs = Math.max(...times);
+      const now = Date.now();
+
+      // Save round
+      const roundId = await saveRound({
+        size: currentRound.size,
+        averageMs: avgMs,
+        bestMs,
+        worstMs,
+        timestamp: now
+      });
+
+      // Save attempts
+      const attempts = currentRound.verses.map((v, i) => ({
+        verse: v.verse,
+        book: v.book,
+        chapter: v.chapter,
+        verseNum: v.verseNum,
+        timeMs: currentRound.times[i],
+        roundId,
+        timestamp: now
+      }));
+      await saveAttempts(attempts);
+
+      // Show summary
+      document.getElementById('summary-title').textContent = 'Awesome Round, Neha!';
+      document.getElementById('summary-encouragement').textContent = randomFrom(SUMMARY_MESSAGES);
+
+      // Round stats
+      const statsEl = document.getElementById('summary-stats');
+      statsEl.innerHTML = `
+        <div class="stat-card"><div class="stat-value blue">${formatTime(avgMs)}</div><div class="stat-label">Average</div></div>
+        <div class="stat-card"><div class="stat-value purple">${formatTime(bestMs)}</div><div class="stat-label">Best</div></div>
+        <div class="stat-card"><div class="stat-value green">${formatTime(worstMs)}</div><div class="stat-label">Slowest</div></div>
+      `;
+
+      // Compare to previous rounds
+      const allRounds = await getAllRounds();
+      const prevRounds = allRounds.filter(r => r.id !== roundId);
+      let comparisonText = '';
+      if (prevRounds.length > 0) {
+        const lastRound = prevRounds[prevRounds.length - 1];
+        const diff = lastRound.averageMs - avgMs;
+        if (diff > 0) {
+          comparisonText = `You're improving, Neha! ${formatTime(diff)} faster than your last round!`;
+        } else if (diff < 0) {
+          comparisonText = `Keep practicing, Neha — you'll beat your last time soon!`;
+        } else {
+          comparisonText = `Same pace as last time — consistency is great!`;
+        }
+      } else {
+        comparisonText = `Your first round ever — great start, Neha!`;
+      }
+      document.getElementById('summary-comparison').textContent = comparisonText;
+
+      // Check badges (filled in Task 5)
+      await showNewBadges();
+
+      showScreen('summary-screen');
+    }
+
+    async function showNewBadges() {
+      // Placeholder — implemented in Task 5
+      document.getElementById('summary-badges').innerHTML = '';
+    }
+```
+
+- [ ] **Step 6: Test the full game loop in browser**
+
+Open `index.html`. Click "5 Verses". Verify:
+1. Verse screen appears with a verse reference, timer counting up, progress bar
+2. Click "Found It!" — result flash shows time and encouragement
+3. After 2 seconds, next verse appears
+4. After 5 verses, round summary shows with stats
+5. Click "Play Again" — returns to home screen
+6. Check DevTools > Application > IndexedDB — verify `rounds` and `attempts` stores have data
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add index.html
+git commit -m "feat: implement game loop with timer, result flash, and round summary"
+```
+
+---
+
+### Task 5: Gamification — streaks, levels, badges, and home screen stats
+
+**Files:**
+- Modify: `index.html` (add to `<script>` block, update `refreshHomeScreen` and `showNewBadges`)
+
+Implement all gamification features and wire up the home screen to display live stats.
+
+- [ ] **Step 1: Add badge definitions**
+
+Add after the encouragement messages:
+
+```javascript
+    // ── Badges ──
+    const BADGE_DEFS = [
+      { id: 'first-steps',    icon: '🌟', name: 'First Steps',       desc: 'Complete your first round' },
+      { id: 'bookworm',       icon: '📚', name: 'Bookworm',          desc: 'Complete 10 rounds' },
+      { id: 'bible-scholar',  icon: '🎓', name: 'Bible Scholar',     desc: 'Complete 50 rounds' },
+      { id: 'speed-demon',    icon: '⚡', name: 'Speed Demon',       desc: 'Find a verse in under 10s' },
+      { id: 'lightning-fast', icon: '💨', name: 'Lightning Fast',    desc: 'Find a verse in under 5s' },
+      { id: 'consistent',     icon: '🔥', name: 'Consistent',        desc: '7-day streak' },
+      { id: 'devoted',        icon: '💎', name: 'Devoted',           desc: '30-day streak' },
+      { id: 'explorer',       icon: '🗺️', name: 'Explorer',          desc: 'Find verses in 20 different books' },
+      { id: 'ot-pro',         icon: '📜', name: 'Old Testament Pro', desc: 'Find verses in all 39 OT books' },
+      { id: 'nt-pro',         icon: '✝️', name: 'New Testament Pro', desc: 'Find verses in all 27 NT books' },
+      { id: 'master-nav',     icon: '👑', name: 'Master Navigator',  desc: 'Find verses in all 66 books' },
+    ];
+
+    // ── Levels ──
+    const LEVELS = [
+      { level: 1,  name: 'Beginner',        rounds: 0 },
+      { level: 2,  name: 'Learner',          rounds: 5 },
+      { level: 3,  name: 'Reader',           rounds: 15 },
+      { level: 4,  name: 'Explorer',         rounds: 30 },
+      { level: 5,  name: 'Scholar',          rounds: 50 },
+      { level: 6,  name: 'Expert',           rounds: 80 },
+      { level: 7,  name: 'Master',           rounds: 120 },
+      { level: 8,  name: 'Champion',         rounds: 170 },
+      { level: 9,  name: 'Legend',           rounds: 230 },
+      { level: 10, name: 'Bible Navigator',  rounds: 300 },
+    ];
+```
+
+- [ ] **Step 2: Add streak, level, and badge calculation functions**
+
+```javascript
+    function calcStreak(rounds) {
+      if (rounds.length === 0) return 0;
+      const days = [...new Set(rounds.map(r => new Date(r.timestamp).toDateString()))].sort((a, b) => new Date(b) - new Date(a));
+      const today = new Date().toDateString();
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      if (days[0] !== today && days[0] !== yesterday) return 0;
+      let streak = 1;
+      for (let i = 0; i < days.length - 1; i++) {
+        const curr = new Date(days[i]);
+        const prev = new Date(days[i + 1]);
+        const diff = (curr - prev) / 86400000;
+        if (Math.round(diff) === 1) streak++;
+        else break;
+      }
+      return streak;
+    }
+
+    function calcLevel(totalRounds) {
+      let current = LEVELS[0];
+      for (const lvl of LEVELS) {
+        if (totalRounds >= lvl.rounds) current = lvl;
+        else break;
+      }
+      const next = LEVELS.find(l => l.rounds > totalRounds);
+      const progress = next
+        ? (totalRounds - current.rounds) / (next.rounds - current.rounds) * 100
+        : 100;
+      return { ...current, progress: Math.min(100, progress) };
+    }
+
+    function calcBadges(rounds, attempts, streak) {
+      const totalRounds = rounds.length;
+      const uniqueBooks = new Set(attempts.map(a => a.book));
+      const otBooks = new Set(BIBLE.slice(0, 39).map(b => b.name));
+      const ntBooks = new Set(BIBLE.slice(39).map(b => b.name));
+      const foundOT = [...otBooks].filter(b => uniqueBooks.has(b));
+      const foundNT = [...ntBooks].filter(b => uniqueBooks.has(b));
+      const fastestMs = attempts.length > 0 ? Math.min(...attempts.map(a => a.timeMs)) : Infinity;
+
+      const earned = new Set();
+      if (totalRounds >= 1) earned.add('first-steps');
+      if (totalRounds >= 10) earned.add('bookworm');
+      if (totalRounds >= 50) earned.add('bible-scholar');
+      if (fastestMs < 10000) earned.add('speed-demon');
+      if (fastestMs < 5000) earned.add('lightning-fast');
+      if (streak >= 7) earned.add('consistent');
+      if (streak >= 30) earned.add('devoted');
+      if (uniqueBooks.size >= 20) earned.add('explorer');
+      if (foundOT.length >= 39) earned.add('ot-pro');
+      if (foundNT.length >= 27) earned.add('nt-pro');
+      if (uniqueBooks.size >= 66) earned.add('master-nav');
+
+      return earned;
+    }
+```
+
+- [ ] **Step 3: Implement refreshHomeScreen**
+
+Replace the empty `refreshHomeScreen` function:
+
+```javascript
+    async function refreshHomeScreen() {
+      const rounds = await getAllRounds();
+      const attempts = await getAllAttempts();
+      const streak = calcStreak(rounds);
+      const level = calcLevel(rounds.length);
+      const earned = calcBadges(rounds, attempts, streak);
+
+      // Welcome message
+      document.getElementById('home-welcome').textContent =
+        rounds.length > 0 ? 'Welcome back, Neha!' : 'Welcome, Neha!';
+
+      // Streak
+      const streakEl = document.getElementById('streak-banner');
+      if (streak > 0) {
+        streakEl.textContent = `🔥 ${streak} day streak! ${streak >= 5 ? 'Amazing dedication!' : 'Keep it going!'}`;
+      } else if (rounds.length > 0) {
+        streakEl.textContent = 'Start a round today to begin a new streak!';
+      } else {
+        streakEl.textContent = 'Ready for your first round, Neha?';
+      }
+
+      // Level
+      document.getElementById('level-label').textContent =
+        `Level ${level.level} · ${level.name}`;
+      document.getElementById('level-bar-fill').style.width = `${level.progress}%`;
+
+      // Stats
+      if (attempts.length > 0) {
+        const bestMs = Math.min(...attempts.map(a => a.timeMs));
+        const avgMs = attempts.reduce((sum, a) => sum + a.timeMs, 0) / attempts.length;
+        document.getElementById('stat-best').textContent = formatTime(bestMs);
+        document.getElementById('stat-avg').textContent = formatTime(avgMs);
+      } else {
+        document.getElementById('stat-best').textContent = '—';
+        document.getElementById('stat-avg').textContent = '—';
+      }
+      document.getElementById('stat-rounds').textContent = rounds.length;
+
+      // Badges
+      const grid = document.getElementById('badges-grid');
+      grid.innerHTML = '';
+      for (const badge of BADGE_DEFS) {
+        const el = document.createElement('div');
+        el.className = 'badge' + (earned.has(badge.id) ? '' : ' locked');
+        el.textContent = badge.icon;
+        el.title = `${badge.name}: ${badge.desc}`;
+        grid.appendChild(el);
+      }
+    }
+```
+
+- [ ] **Step 4: Implement showNewBadges for round summary**
+
+Replace the placeholder `showNewBadges` function:
+
+```javascript
+    async function showNewBadges() {
+      const rounds = await getAllRounds();
+      const attempts = await getAllAttempts();
+      const streak = calcStreak(rounds);
+      const earned = calcBadges(rounds, attempts, streak);
+
+      // Determine which badges are new (earned now but not before this round)
+      const prevRounds = rounds.slice(0, -1);
+      const prevAttempts = attempts.filter(a => a.roundId !== rounds[rounds.length - 1]?.id);
+      const prevStreak = calcStreak(prevRounds);
+      const prevEarned = calcBadges(prevRounds, prevAttempts, prevStreak);
+
+      const newBadges = [...earned].filter(id => !prevEarned.has(id));
+      const container = document.getElementById('summary-badges');
+      container.innerHTML = '';
+
+      for (const id of newBadges) {
+        const badge = BADGE_DEFS.find(b => b.id === id);
+        const el = document.createElement('div');
+        el.className = 'summary-badge';
+        el.innerHTML = `<span class="summary-badge-icon">${badge.icon}</span><span class="summary-badge-name">${badge.name}</span>`;
+        container.appendChild(el);
+      }
+    }
+```
+
+- [ ] **Step 5: Test in browser**
+
+Open `index.html`. Verify:
+1. Home screen shows "Welcome, Neha!", Level 1 Beginner, streak prompt, dashes for stats, all badges locked
+2. Complete a 5-verse round
+3. Round summary shows "First Steps" badge earned
+4. Home screen updates: "Welcome back, Neha!", stats populated, Level 1 progress bar moved, First Steps badge unlocked
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add index.html
+git commit -m "feat: add gamification — streaks, levels, badges, and home screen stats"
+```
+
+---
+
+### Task 6: Polish and final verification
+
+**Files:**
+- Modify: `index.html`
+
+Add finishing touches: keyboard support (spacebar for "Found It!"), smooth transitions, and a final end-to-end test.
+
+- [ ] **Step 1: Add keyboard shortcut for Found It button**
+
+Add at the end of the `<script>` block (before the closing `</script>` tag):
+
+```javascript
+    // ── Keyboard Support ──
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && document.getElementById('verse-screen').classList.contains('active')) {
+        e.preventDefault();
+        foundIt();
+      }
+    });
+```
+
+- [ ] **Step 2: Add CSS transitions for screen changes**
+
+Add to the `<style>` block:
+
+```css
+    .screen { opacity: 0; transition: opacity 0.2s ease; }
+    .screen.active { opacity: 1; }
+```
+
+Note: update the existing `.screen` rule to add `opacity: 0;` and the `.screen.active` rule to add `opacity: 1;`. Keep the existing `display` and `flex` properties.
+
+- [ ] **Step 3: Add a tooltip-style badge hover effect**
+
+Add to the `<style>` block:
+
+```css
+    .badge { cursor: help; transition: transform 0.15s; }
+    .badge:hover { transform: scale(1.2); }
+```
+
+- [ ] **Step 4: End-to-end browser test**
+
+Open `index.html` in a fresh browser (or clear IndexedDB first via DevTools). Run through this checklist:
+
+1. Home screen: "Welcome, Neha!", Level 1, all badges locked, no stats
+2. Click "5 Verses" — verse screen appears with timer running
+3. Press spacebar — timer stops, result flash shows with encouragement
+4. After 5 verses — round summary shows with stats, "First Steps" badge
+5. Click "Play Again" — home screen shows updated stats, badge unlocked
+6. Run another round — verify "Welcome back, Neha!" and stats update
+7. Close tab, reopen `index.html` — verify all data persisted
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add index.html
+git commit -m "feat: add keyboard support, transitions, and polish"
+```
+
+---
+
+## Summary
+
+| Task | Description | Key Output |
+|------|-------------|------------|
+| 1 | HTML skeleton with CSS and screens | Visual shell with all 4 screens |
+| 2 | Bible data and verse generation | 66-book data + randomVerse() |
+| 3 | IndexedDB setup | Database with attempts/rounds stores |
+| 4 | Game loop | Timer, found-it flow, round summary |
+| 5 | Gamification | Streaks, levels, badges, home stats |
+| 6 | Polish | Keyboard support, transitions, final test |
