@@ -523,17 +523,36 @@
 
     // ── Badges ──
     const BADGE_DEFS = [
+      // Milestones
       { id: 'first-steps',    icon: '🌟', name: 'First Steps',       desc: 'Complete your first round' },
       { id: 'bookworm',       icon: '📚', name: 'Bookworm',          desc: 'Complete 10 rounds' },
       { id: 'bible-scholar',  icon: '🎓', name: 'Bible Scholar',     desc: 'Complete 50 rounds' },
+      { id: 'centurion',      icon: '💯', name: 'Centurion',         desc: 'Complete 100 rounds' },
+      // Speed
+      { id: 'quick-find',     icon: '🏃', name: 'Quick Find',        desc: 'Find a verse in under 15s' },
+      { id: 'sharp-eyes',     icon: '👀', name: 'Sharp Eyes',        desc: 'Find a verse in under 13s' },
       { id: 'speed-demon',    icon: '⚡', name: 'Speed Demon',       desc: 'Find a verse in under 10s' },
+      { id: 'ninja',          icon: '🥷', name: 'Bible Ninja',       desc: 'Find a verse in under 7s' },
       { id: 'lightning-fast', icon: '💨', name: 'Lightning Fast',    desc: 'Find a verse in under 5s' },
+      // Streaks
+      { id: 'on-a-roll',      icon: '🎯', name: 'On a Roll',         desc: '3-day streak' },
       { id: 'consistent',     icon: '🔥', name: 'Consistent',        desc: '7-day streak' },
+      { id: 'unstoppable',    icon: '💪', name: 'Unstoppable',       desc: '14-day streak' },
       { id: 'devoted',        icon: '💎', name: 'Devoted',           desc: '30-day streak' },
+      // Exploration
+      { id: 'adventurer',     icon: '🧭', name: 'Adventurer',        desc: 'Find verses in 10 different books' },
       { id: 'explorer',       icon: '🗺️', name: 'Explorer',          desc: 'Find verses in 20 different books' },
+      { id: 'globetrotter',   icon: '🌍', name: 'Globetrotter',      desc: 'Find verses in 40 different books' },
       { id: 'ot-pro',         icon: '📜', name: 'Old Testament Pro', desc: 'Find verses in all 39 OT books' },
       { id: 'nt-pro',         icon: '✝️', name: 'New Testament Pro', desc: 'Find verses in all 27 NT books' },
       { id: 'master-nav',     icon: '👑', name: 'Master Navigator',  desc: 'Find verses in all 66 books' },
+      // Volume
+      { id: 'century-verses', icon: '📖', name: '100 Verses',        desc: 'Find 100 verses total' },
+      { id: '500-club',       icon: '🏅', name: '500 Club',          desc: 'Find 500 verses total' },
+      { id: 'thousand',       icon: '🏆', name: 'Verse Thousand',    desc: 'Find 1,000 verses total' },
+      // Fun
+      { id: 'perfect-round',  icon: '✨', name: 'Perfect Round',     desc: 'All verses under 15s in a single round' },
+      { id: 'sunday-ready',   icon: '⛪', name: 'Sunday Ready',      desc: 'Complete 5 rounds in a single day' },
     ];
 
     // ── Levels ──
@@ -582,25 +601,48 @@
 
     function calcBadges(rounds, attempts, streak) {
       const totalRounds = rounds.length;
+      const totalAttempts = attempts.length;
       const uniqueBooks = new Set(attempts.map(a => a.book));
       const otBooks = new Set(BIBLE.slice(0, 39).map(b => b.name));
       const ntBooks = new Set(BIBLE.slice(39).map(b => b.name));
       const foundOT = [...otBooks].filter(b => uniqueBooks.has(b));
       const foundNT = [...ntBooks].filter(b => uniqueBooks.has(b));
-      const fastestMs = attempts.length > 0 ? Math.min(...attempts.map(a => a.timeMs)) : Infinity;
+      const fastestMs = totalAttempts > 0 ? Math.min(...attempts.map(a => a.timeMs)) : Infinity;
 
       const earned = new Set();
+      // Milestones
       if (totalRounds >= 1) earned.add('first-steps');
       if (totalRounds >= 10) earned.add('bookworm');
       if (totalRounds >= 50) earned.add('bible-scholar');
+      if (totalRounds >= 100) earned.add('centurion');
+      // Speed
+      if (fastestMs < 15000) earned.add('quick-find');
+      if (fastestMs < 13000) earned.add('sharp-eyes');
       if (fastestMs < 10000) earned.add('speed-demon');
+      if (fastestMs < 7000) earned.add('ninja');
       if (fastestMs < 5000) earned.add('lightning-fast');
+      // Streaks
+      if (streak >= 3) earned.add('on-a-roll');
       if (streak >= 7) earned.add('consistent');
+      if (streak >= 14) earned.add('unstoppable');
       if (streak >= 30) earned.add('devoted');
+      // Exploration
+      if (uniqueBooks.size >= 10) earned.add('adventurer');
       if (uniqueBooks.size >= 20) earned.add('explorer');
+      if (uniqueBooks.size >= 40) earned.add('globetrotter');
       if (foundOT.length >= 39) earned.add('ot-pro');
       if (foundNT.length >= 27) earned.add('nt-pro');
       if (uniqueBooks.size >= 66) earned.add('master-nav');
+      // Volume
+      if (totalAttempts >= 100) earned.add('century-verses');
+      if (totalAttempts >= 500) earned.add('500-club');
+      if (totalAttempts >= 1000) earned.add('thousand');
+      // Fun
+      if (rounds.some(r => r.bestMs < 15000 && r.worstMs < 15000)) earned.add('perfect-round');
+      // Sunday Ready: 5 rounds in a single day
+      const today = new Date().toDateString();
+      const roundsToday = rounds.filter(r => new Date(r.timestamp).toDateString() === today).length;
+      if (roundsToday >= 5) earned.add('sunday-ready');
 
       return earned;
     }
